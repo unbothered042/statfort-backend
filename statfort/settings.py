@@ -77,19 +77,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "statfort.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv('DB_NAME', 'statfort_db'),
-        "USER": os.getenv('DB_USER', 'root'),
-        "PASSWORD": os.getenv('DB_PASSWORD', ''),
-        "HOST": os.getenv('DB_HOST', '127.0.0.1'),
-        "PORT": os.getenv('DB_PORT', '3306'),
-        "OPTIONS": {
-            "autocommit": True,
+import urllib.parse
+
+MYSQL_URL = os.environ.get('MYSQL_URL')
+
+if MYSQL_URL:
+    parsed = urllib.parse.urlparse(MYSQL_URL)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': parsed.path[1:],
+            'USER': parsed.username,
+            'PASSWORD': parsed.password,
+            'HOST': parsed.hostname,
+            'PORT': parsed.port or 3306,
         }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME', 'statfort_db'),
+            'USER': os.getenv('DB_USER', 'root'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', '127.0.0.1'),
+            'PORT': os.getenv('DB_PORT', '3306'),
+            'OPTIONS': {
+                'autocommit': True,
+            }
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
