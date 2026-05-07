@@ -4,7 +4,6 @@ RUN apt-get update && apt-get install -y \
     gcc \
     pkg-config \
     default-libmysqlclient-dev \
-    libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
