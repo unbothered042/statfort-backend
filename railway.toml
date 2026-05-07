@@ -1,8 +1,0 @@
-[build]
-builder = "railpack"
-
-[deploy]
-startCommand = "gunicorn statfort.wsgi --log-file -"
-
-[[deploy.environmentVariables]]
-availableAtBuild = false
