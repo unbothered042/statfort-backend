@@ -1,0 +1,1 @@
+web: gunicorn statfort.wsgi --log-file -
