@@ -19,7 +19,7 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('SECRET_KEY', '0a!1imk0ucy@0*an9g7%nge8&omk2z2jf+prwpuc1j^jw-u$v*')
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
@@ -143,4 +143,6 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-FORTNITE_API_KEY = os.getenv('2ad257ab-eff7-4345-8ad7-634ef91a7fd1')
+
+
+FORTNITE_API_KEY = os.getenv('FORTNITE_API_KEY')
