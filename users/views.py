@@ -14,6 +14,7 @@ from .serializers import (
 )
 import random
 from datetime import timedelta
+import os
 
 
 def generate_otp():
@@ -31,7 +32,7 @@ def send_otp_email(email, code, purpose):
     send_mail(
         subject,
         message,
-        settings.DEFAULT_FROM_EMAIL,
+        os.getenv('DEFAULT_FROM_EMAIL'),
         [email],
         fail_silently=False,
     )
