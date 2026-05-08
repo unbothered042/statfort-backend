@@ -49,7 +49,10 @@ class RegisterView(APIView):
                 purpose='verify_email',
                 expires_at=timezone.now() + timedelta(minutes=10),
             )
-            send_otp_email(user.email, code, 'verify_email')
+            try:
+                send_otp_email(user.email, code, 'verify_email')
+            except Exception as e:
+                print(f"Email sending failed: {str(e)}")
             return Response({'message': 'Registration successful. Check your email for your verification code.'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
