@@ -1,7 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from django.conf import settings
@@ -13,8 +12,8 @@ from .serializers import (
     ForgotPasswordSerializer, ResetPasswordSerializer
 )
 import random
+import threading
 from datetime import timedelta
-import os
 
 
 def generate_otp():
@@ -29,13 +28,22 @@ def send_otp_email(email, code, purpose):
         subject = 'StatFort - Password Reset Code'
         message = f'Your StatFort password reset code is: {code}\n\nThis code expires in 10 minutes.'
 
-    send_mail(
-        subject,
-        message,
-        os.getenv('DEFAULT_FROM_EMAIL'),
-        [email],
-        fail_silently=False,
-    )
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=True,
+        )
+    except Exception as e:
+        print(f"Email error: {str(e)}")
+
+
+def send_email_async(email, code, purpose):
+    thread = threading.Thread(target=send_otp_email, args=(email, code, purpose))
+    thread.daemon = True
+    thread.start()
 
 
 class RegisterView(APIView):
@@ -50,10 +58,7 @@ class RegisterView(APIView):
                 purpose='verify_email',
                 expires_at=timezone.now() + timedelta(minutes=10),
             )
-            try:
-                send_otp_email(user.email, code, 'verify_email')
-            except Exception as e:
-                print(f"Email sending failed: {str(e)}")
+            send_email_async(user.email, code, 'verify_email')
             return Response({'message': 'Registration successful. Check your email for your verification code.'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -106,6 +111,7 @@ class LoginView(APIView):
                 'refresh': str(token),
                 'access': str(token.access_token),
             }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ForgotPasswordView(APIView):
@@ -122,7 +128,7 @@ class ForgotPasswordView(APIView):
                     purpose='reset_password',
                     expires_at=timezone.now() + timedelta(minutes=10),
                 )
-                send_otp_email(user.email, code, 'reset_password')
+                send_email_async(user.email, code, 'reset_password')
                 return Response({'message': 'Password reset code sent to your email.'}, status=status.HTTP_200_OK)
             except User.DoesNotExist:
                 return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
