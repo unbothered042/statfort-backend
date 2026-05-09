@@ -22,7 +22,7 @@ def generate_otp():
 
 
 def send_otp_email(email, code, purpose):
-    import sib_api_v3_sdk
+    import resend
 
     if purpose == 'verify_email':
         subject = 'StatFort - Verify Your Email'
@@ -31,22 +31,18 @@ def send_otp_email(email, code, purpose):
         subject = 'StatFort - Password Reset Code'
         message = f'Your StatFort password reset code is: <strong>{code}</strong><br><br>This code expires in 10 minutes.'
 
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = os.getenv('EMAIL_HOST_PASSWORD')
-
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
-
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=[{"email": email}],
-        sender={"name": "StatFort", "email": os.getenv('DEFAULT_FROM_EMAIL')},
-        subject=subject,
-        html_content=f'<p>{message}</p>'
-    )
+    resend.api_key = os.getenv('RESEND_API_KEY')
 
     try:
-        api_instance.send_transac_email(send_smtp_email)
+        resend.Emails.send({
+            "from": "StatFort <onboarding@resend.dev>",
+            "to": [email],
+            "subject": subject,
+            "html": f'<p>{message}</p>'
+        })
+        print(f"Email sent successfully to {email}")
     except Exception as e:
-        print(f"Brevo API error: {str(e)}")
+        print(f"Resend error: {str(e)}")
 
 
 def send_email_async(email, code, purpose):
