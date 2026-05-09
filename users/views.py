@@ -23,7 +23,6 @@ def generate_otp():
 
 def send_otp_email(email, code, purpose):
     import sib_api_v3_sdk
-    from sib_api_v3_sdk.rest import ApiException
 
     if purpose == 'verify_email':
         subject = 'StatFort - Verify Your Email'
@@ -33,7 +32,7 @@ def send_otp_email(email, code, purpose):
         message = f'Your StatFort password reset code is: <strong>{code}</strong><br><br>This code expires in 10 minutes.'
 
     configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key['api-key'] = os.getenv('BREVO_API_KEY')
+    configuration.api_key['api-key'] = os.getenv('EMAIL_HOST_PASSWORD')
 
     api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
@@ -46,8 +45,9 @@ def send_otp_email(email, code, purpose):
 
     try:
         api_instance.send_transac_email(send_smtp_email)
-    except ApiException as e:
+    except Exception as e:
         print(f"Brevo API error: {str(e)}")
+
 
 def send_email_async(email, code, purpose):
     thread = threading.Thread(target=send_otp_email, args=(email, code, purpose))
