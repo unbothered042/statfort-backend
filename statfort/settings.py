@@ -165,3 +165,4 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 FORTNITE_API_KEY = os.getenv('FORTNITE_API_KEY')
+APEX_API_KEY = os.getenv('APEX_API_KEY')

@@ -31,6 +31,20 @@ def fetch_fortnite_stats(gaming_id):
     except Exception as e:
         return {'status': 500, 'error': str(e)}
 
+def fetch_apex_stats(gaming_id, platform='PC'):
+    try:
+        api_key = os.getenv('APEX_API_KEY')
+        url = f"https://api.mozambiquehe.re/bridge"
+        params = {
+            "auth": api_key,
+            "player": gaming_id,
+            "platform": platform,
+        }
+        response = requests.get(url, params=params)
+        return response.json()
+    except Exception as e:
+        return {'Error': str(e)}
+
 def verify_screenshot_with_ai(screenshot_file, gaming_id, game_name):
     try:
         screenshot_file.seek(0)
@@ -129,6 +143,54 @@ class FortniteStatsView(APIView):
         serializer = PlayerStatsSerializer(stats)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+class ApexStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        player_game_id = request.data.get('player_game_id')
+        platform = request.data.get('platform', 'PC')
+
+        if not player_game_id:
+            return Response({'error': 'player_game_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            player_game = PlayerGame.objects.get(id=player_game_id, user=request.user, game__slug='apex-legends')
+        except PlayerGame.DoesNotExist:
+            return Response({'error': 'Apex Legends player game not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        api_response = fetch_apex_stats(player_game.gaming_id, platform)
+
+        if 'Error' in api_response:
+            return Response({'error': api_response['Error']}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            total_kills = api_response.get('total', {}).get('kills', {}).get('value', 0)
+            total_deaths = api_response.get('total', {}).get('deaths', {}).get('value', 0)
+            total_games = api_response.get('total', {}).get('games_played', {}).get('value', 0)
+            total_wins = api_response.get('total', {}).get('wins', {}).get('value', 0)
+            score = api_response.get('total', {}).get('rank_score', {}).get('value', 0)
+        except Exception:
+            total_kills = 0
+            total_deaths = 0
+            total_games = 0
+            total_wins = 0
+            score = 0
+
+        stats, created = PlayerStats.objects.update_or_create(
+            player_game=player_game,
+            defaults={
+                'kills': total_kills,
+                'deaths': total_deaths,
+                'assists': 0,
+                'wins': total_wins,
+                'matches_played': total_games,
+                'score': score,
+                'status': 'approved',
+            }
+        )
+
+        serializer = PlayerStatsSerializer(stats)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class CODStatsSubmitView(APIView):
     permission_classes = [IsAuthenticated]
