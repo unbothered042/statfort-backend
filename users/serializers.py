@@ -7,7 +7,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'phone', 'password']
+        fields = ['first_name', 'last_name', 'email', 'username', 'password']
+
+    def validate_username(self, value):
+        if value and User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return value
 
     def create(self, validated_data):
         user = User.objects.create_user(
@@ -15,13 +20,13 @@ class RegisterSerializer(serializers.ModelSerializer):
             last_name=validated_data['last_name'],
             email=validated_data['email'],
             password=validated_data['password'],
-            phone=validated_data.get('phone', ''),
+            username=validated_data.get('username', ''),
         )
         return user
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    identifier = serializers.CharField()
     password = serializers.CharField(max_length=128, min_length=6, write_only=True)
 
 
@@ -36,5 +41,4 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    code = serializers.CharField(max_length=6)
     new_password = serializers.CharField(max_length=128, min_length=6, write_only=True)

@@ -1,12 +1,8 @@
-# from django.db import models
-
-# Create your models here.
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-import random
 from django.utils import timezone
 
 
@@ -23,13 +19,10 @@ class UserManager(BaseUserManager):
             self.email_validator(email)
         else:
             raise ValueError(_("An email address is required."))
-
         if not first_name:
             raise ValueError(_("First name is required."))
-
         if not last_name:
             raise ValueError(_("Last name is required."))
-
         user = self.model(email=email, first_name=first_name, last_name=last_name, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -55,7 +48,7 @@ class User(AbstractBaseUser):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     email = models.EmailField(max_length=100, unique=True)
-    phone = models.CharField(max_length=15, blank=True)
+    username = models.CharField(max_length=50, unique=True, blank=True, null=True)
     is_superuser = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)

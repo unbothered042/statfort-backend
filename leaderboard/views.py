@@ -2,14 +2,20 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from django.core.cache import cache
 from stats.models import PlayerStats
-from stats.serializers import PlayerStatsSerializer
 
 
 class LeaderboardView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, game_slug):
+        cache_key = f'leaderboard_{game_slug}'
+        cached = cache.get(cache_key)
+
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK)
+
         stats = PlayerStats.objects.filter(
             player_game__game__slug=game_slug,
             status='approved'
@@ -31,4 +37,5 @@ class LeaderboardView(APIView):
                 'score': stat.score,
             })
 
+        cache.set(cache_key, data, 300)
         return Response(data, status=status.HTTP_200_OK)

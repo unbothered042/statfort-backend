@@ -2,26 +2,24 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, BasePermission
+from django.core.cache import cache
 from .models import PlayerStats
 from .serializers import PlayerStatsSerializer, CODStatsSubmitSerializer
 from games.models import PlayerGame
-from django.conf import settings
 import os
 import base64
 import json
 import requests
 from groq import Groq
 
+
 class IsSuperUser(BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
 
 
-
 def fetch_fortnite_stats(gaming_id):
     try:
-        import requests
-        import os
         api_key = os.getenv('FORTNITE_API_KEY')
         url = "https://fortnite-api.com/v2/stats/br/v2"
         headers = {"Authorization": api_key}
@@ -31,10 +29,11 @@ def fetch_fortnite_stats(gaming_id):
     except Exception as e:
         return {'status': 500, 'error': str(e)}
 
+
 def fetch_apex_stats(gaming_id, platform='PC'):
     try:
         api_key = os.getenv('APEX_API_KEY')
-        url = f"https://api.mozambiquehe.re/bridge"
+        url = "https://api.mozambiquehe.re/bridge"
         params = {
             "auth": api_key,
             "player": gaming_id,
@@ -44,6 +43,7 @@ def fetch_apex_stats(gaming_id, platform='PC'):
         return response.json()
     except Exception as e:
         return {'Error': str(e)}
+
 
 def verify_screenshot_with_ai(screenshot_file, gaming_id, game_name):
     try:
@@ -140,8 +140,12 @@ class FortniteStatsView(APIView):
             }
         )
 
+        cache.delete(f'leaderboard_{player_game.game.slug}')
+        cache.delete(f'player_stats_{request.user.id}')
+
         serializer = PlayerStatsSerializer(stats)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class ApexStatsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -189,8 +193,12 @@ class ApexStatsView(APIView):
             }
         )
 
+        cache.delete(f'leaderboard_{player_game.game.slug}')
+        cache.delete(f'player_stats_{request.user.id}')
+
         serializer = PlayerStatsSerializer(stats)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class CODStatsSubmitView(APIView):
     permission_classes = [IsAuthenticated]
@@ -233,6 +241,9 @@ class CODStatsSubmitView(APIView):
                 }
             )
 
+            cache.delete(f'leaderboard_{player_game.game.slug}')
+            cache.delete(f'player_stats_{request.user.id}')
+
             stat_serializer = PlayerStatsSerializer(stats)
             return Response({
                 'message': 'Stats verified and approved by AI.',
@@ -246,11 +257,17 @@ class PlayerStatsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        cache_key = f'player_stats_{request.user.id}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK)
+
         stats = PlayerStats.objects.filter(
             player_game__user=request.user,
             status='approved'
         )
         serializer = PlayerStatsSerializer(stats, many=True)
+        cache.set(cache_key, serializer.data, 120)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

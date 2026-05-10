@@ -81,13 +81,24 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
+            identifier = serializer.validated_data['identifier']
             password = serializer.validated_data['password']
-            user = authenticate(request, email=email, password=password)
+
+            user = None
+            if '@' in identifier:
+                user = authenticate(request, email=identifier, password=password)
+            else:
+                try:
+                    user_obj = User.objects.get(username__iexact=identifier)
+                    user = authenticate(request, email=user_obj.email, password=password)
+                except User.DoesNotExist:
+                    pass
+
             if not user:
                 return Response({'error': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
             if not user.is_verified:
                 return Response({'error': 'Please verify your email before logging in.'}, status=status.HTTP_403_FORBIDDEN)
+
             token = RefreshToken.for_user(user)
             return Response({
                 'message': 'Login successful.',
@@ -96,6 +107,7 @@ class LoginView(APIView):
                     'first_name': user.first_name,
                     'last_name': user.last_name,
                     'email': user.email,
+                    'username': user.username,
                     'is_superuser': user.is_superuser,
                 },
                 'refresh': str(token),
@@ -124,7 +136,6 @@ class ResetPasswordView(APIView):
 
         if not email or not new_password:
             return Response({'error': 'Email and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
-
         if len(new_password) < 6:
             return Response({'error': 'Password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
 
