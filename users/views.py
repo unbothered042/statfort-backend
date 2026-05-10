@@ -40,6 +40,20 @@ def send_otp_email(email, code, purpose):
     except Exception as e:
         print(f"Resend error: {str(e)}")
 
+class TestEmailView(APIView):
+    def get(self, request):
+        try:
+            resend.api_key = os.getenv('RESEND_API_KEY')
+            response = resend.Emails.send({
+                "from": "StatFort <onboarding@resend.dev>",
+                "to": ["statfort9@gmail.com"],
+                "subject": "StatFort Test from Server",
+                "html": "<p>This email was sent from the Railway server.</p>"
+            })
+            return Response({'success': True, 'response': str(response)}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class RegisterView(APIView):
     def post(self, request):

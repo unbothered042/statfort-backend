@@ -10,4 +10,5 @@ urlpatterns = [
     path('reset-password/', views.ResetPasswordView.as_view(), name='reset-password'),
     path('admin/users/', admin_views.AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<int:id>/', admin_views.AdminUserDeleteView.as_view(), name='admin-user-delete'),
+    path('test-email/', views.TestEmailView.as_view(), name='test-email'),
 ]
