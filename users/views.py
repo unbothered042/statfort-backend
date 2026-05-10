@@ -40,35 +40,16 @@ def send_otp_email(email, code, purpose):
     except Exception as e:
         print(f"Resend error: {str(e)}")
 
-class TestEmailView(APIView):
-    def get(self, request):
-        try:
-            resend.api_key = os.getenv('RESEND_API_KEY')
-            response = resend.Emails.send({
-                "from": "StatFort <onboarding@resend.dev>",
-                "to": ["statfort9@gmail.com"],
-                "subject": "StatFort Test from Server",
-                "html": "<p>This email was sent from the Railway server.</p>"
-            })
-            return Response({'success': True, 'response': str(response)}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            code = generate_otp()
-            OTP.objects.create(
-                user=user,
-                code=code,
-                purpose='verify_email',
-                expires_at=timezone.now() + timedelta(minutes=10),
-            )
-            send_otp_email(user.email, code, 'verify_email')
-            return Response({'message': 'Registration successful. Check your email for your verification code.'}, status=status.HTTP_201_CREATED)
+            user.is_active = True
+            user.is_verified = True
+            user.save()
+            return Response({'message': 'Registration successful. You can now log in.'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -82,7 +63,7 @@ class VerifyEmailView(APIView):
                 user = User.objects.get(email=email)
                 otp = OTP.objects.filter(user=user, code=code, purpose='verify_email', is_used=False).latest('created_at')
                 if otp.is_expired():
-                    return Response({'error': 'OTP has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error': 'OTP has expired.'}, status=status.HTTP_400_BAD_REQUEST)
                 otp.is_used = True
                 otp.save()
                 user.is_active = True
@@ -130,15 +111,7 @@ class ForgotPasswordView(APIView):
             email = serializer.validated_data['email']
             try:
                 user = User.objects.get(email=email)
-                code = generate_otp()
-                OTP.objects.create(
-                    user=user,
-                    code=code,
-                    purpose='reset_password',
-                    expires_at=timezone.now() + timedelta(minutes=10),
-                )
-                send_otp_email(user.email, code, 'reset_password')
-                return Response({'message': 'Password reset code sent to your email.'}, status=status.HTTP_200_OK)
+                return Response({'message': 'Email found. You can now reset your password.'}, status=status.HTTP_200_OK)
             except User.DoesNotExist:
                 return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -146,23 +119,34 @@ class ForgotPasswordView(APIView):
 
 class ResetPasswordView(APIView):
     def post(self, request):
-        serializer = ResetPasswordSerializer(data=request.data)
-        if serializer.is_valid():
-            email = serializer.validated_data['email']
-            code = serializer.validated_data['code']
-            new_password = serializer.validated_data['new_password']
-            try:
-                user = User.objects.get(email=email)
-                otp = OTP.objects.filter(user=user, code=code, purpose='reset_password', is_used=False).latest('created_at')
-                if otp.is_expired():
-                    return Response({'error': 'OTP has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
-                otp.is_used = True
-                otp.save()
-                user.set_password(new_password)
-                user.save()
-                return Response({'message': 'Password reset successful. You can now log in.'}, status=status.HTTP_200_OK)
-            except User.DoesNotExist:
-                return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-            except OTP.DoesNotExist:
-                return Response({'error': 'Invalid OTP.'}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        email = request.data.get('email')
+        new_password = request.data.get('new_password')
+
+        if not email or not new_password:
+            return Response({'error': 'Email and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 6:
+            return Response({'error': 'Password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+            user.set_password(new_password)
+            user.save()
+            return Response({'message': 'Password reset successful. You can now log in.'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class TestEmailView(APIView):
+    def get(self, request):
+        try:
+            resend.api_key = os.getenv('RESEND_API_KEY')
+            response = resend.Emails.send({
+                "from": "StatFort <onboarding@resend.dev>",
+                "to": ["statfort9@gmail.com"],
+                "subject": "StatFort Test from Server",
+                "html": "<p>This email was sent from the Railway server.</p>"
+            })
+            return Response({'success': True, 'response': str(response)}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
