@@ -108,6 +108,7 @@ class LoginView(APIView):
                     'last_name': user.last_name,
                     'email': user.email,
                     'username': user.username,
+                    'state': user.state,
                     'is_superuser': user.is_superuser,
                 },
                 'refresh': str(token),

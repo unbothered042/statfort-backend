@@ -22,6 +22,7 @@ class AdminUserListView(APIView):
                 'last_name': u.last_name,
                 'email': u.email,
                 'username': u.username,
+                'state': u.state,
                 'is_active': u.is_active,
                 'is_verified': u.is_verified,
                 'created_at': u.created_at,

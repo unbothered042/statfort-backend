@@ -7,7 +7,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email', 'username', 'password']
+        fields = ['first_name', 'last_name', 'email', 'username', 'state', 'password']
 
     def validate_username(self, value):
         if value and User.objects.filter(username__iexact=value).exists():
@@ -21,6 +21,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             password=validated_data['password'],
             username=validated_data.get('username', ''),
+            state=validated_data.get('state', ''),
         )
         return user
 

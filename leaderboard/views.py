@@ -27,6 +27,7 @@ class LeaderboardView(APIView):
                 'rank': rank,
                 'username': stat.player_game.gaming_id,
                 'game': stat.player_game.game.name,
+                'state': stat.player_game.user.state or '',
                 'kills': stat.kills,
                 'deaths': stat.deaths,
                 'assists': stat.assists,
