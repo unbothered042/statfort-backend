@@ -4,6 +4,7 @@ from rest_framework import status
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
 from .models import User, OTP
 from .serializers import (
     RegisterSerializer, LoginSerializer, VerifyOTPSerializer,
@@ -12,6 +13,7 @@ from .serializers import (
 import random
 import os
 import resend
+import requests
 from datetime import timedelta
 
 
@@ -30,13 +32,12 @@ def send_otp_email(email, code, purpose):
     resend.api_key = os.getenv('RESEND_API_KEY')
 
     try:
-        response = resend.Emails.send({
+        resend.Emails.send({
             "from": "StatFort <onboarding@resend.dev>",
             "to": [email],
             "subject": subject,
             "html": f'<p>{message}</p>'
         })
-        print(f"Email sent successfully: {response}")
     except Exception as e:
         print(f"Resend error: {str(e)}")
 
@@ -69,7 +70,7 @@ class VerifyEmailView(APIView):
                 user.is_active = True
                 user.is_verified = True
                 user.save()
-                return Response({'message': 'Email verified successfully. You can now log in.'}, status=status.HTTP_200_OK)
+                return Response({'message': 'Email verified successfully.'}, status=status.HTTP_200_OK)
             except User.DoesNotExist:
                 return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
             except OTP.DoesNotExist:
@@ -99,7 +100,11 @@ class LoginView(APIView):
             if not user.is_verified:
                 return Response({'error': 'Please verify your email before logging in.'}, status=status.HTTP_403_FORBIDDEN)
 
+            user.reset_daily_limits_if_needed()
             token = RefreshToken.for_user(user)
+            is_premium = user.check_premium()
+            ai_limit = user.get_ai_limit()
+
             return Response({
                 'message': 'Login successful.',
                 'user': {
@@ -110,6 +115,12 @@ class LoginView(APIView):
                     'username': user.username,
                     'state': user.state,
                     'is_superuser': user.is_superuser,
+                    'is_premium': is_premium,
+                    'premium_expires_at': user.premium_expires_at,
+                    'ai_insight_count': user.ai_insight_count,
+                    'elite_insight_count': user.elite_insight_count,
+                    'ai_limit': ai_limit,
+                    'ai_limit_reset_at': user.ai_limit_reset_at,
                 },
                 'refresh': str(token),
                 'access': str(token.access_token),
@@ -123,7 +134,7 @@ class ForgotPasswordView(APIView):
         if serializer.is_valid():
             email = serializer.validated_data['email']
             try:
-                user = User.objects.get(email=email)
+                User.objects.get(email=email)
                 return Response({'message': 'Email found. You can now reset your password.'}, status=status.HTTP_200_OK)
             except User.DoesNotExist:
                 return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
@@ -144,9 +155,65 @@ class ResetPasswordView(APIView):
             user = User.objects.get(email=email)
             user.set_password(new_password)
             user.save()
-            return Response({'message': 'Password reset successful. You can now log in.'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Password reset successful.'}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class InitializePaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        paystack_secret = os.getenv('PAYSTACK_SECRET_KEY')
+        headers = {
+            'Authorization': f'Bearer {paystack_secret}',
+            'Content-Type': 'application/json',
+        }
+        data = {
+            'email': user.email,
+            'amount': 150000,
+            'currency': 'NGN',
+            'callback_url': f'{os.getenv("FRONTEND_URL", "https://statfort.vercel.app")}/elite?payment=success',
+            'metadata': {'user_id': user.id, 'plan': 'premium_monthly'},
+        }
+        response = requests.post('https://api.paystack.co/transaction/initialize', json=data, headers=headers)
+        result = response.json()
+
+        if result.get('status'):
+            return Response({
+                'authorization_url': result['data']['authorization_url'],
+                'reference': result['data']['reference'],
+            }, status=status.HTTP_200_OK)
+
+        return Response({'error': 'Payment initialization failed.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VerifyPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        reference = request.data.get('reference')
+        if not reference:
+            return Response({'error': 'Reference is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        paystack_secret = os.getenv('PAYSTACK_SECRET_KEY')
+        headers = {'Authorization': f'Bearer {paystack_secret}'}
+        response = requests.get(f'https://api.paystack.co/transaction/verify/{reference}', headers=headers)
+        result = response.json()
+
+        if result.get('status') and result['data']['status'] == 'success':
+            user = request.user
+            user.is_premium = True
+            user.premium_expires_at = timezone.now() + timedelta(days=30)
+            user.save()
+            return Response({
+                'message': 'Payment verified. Premium activated for 30 days.',
+                'is_premium': True,
+                'premium_expires_at': user.premium_expires_at,
+            }, status=status.HTTP_200_OK)
+
+        return Response({'error': 'Payment verification failed.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class TestEmailView(APIView):
@@ -156,9 +223,9 @@ class TestEmailView(APIView):
             response = resend.Emails.send({
                 "from": "StatFort <onboarding@resend.dev>",
                 "to": ["statfort9@gmail.com"],
-                "subject": "StatFort Test from Server",
-                "html": "<p>This email was sent from the Railway server.</p>"
+                "subject": "StatFort Test",
+                "html": "<p>Test email from StatFort server.</p>"
             })
-            return Response({'success': True, 'response': str(response)}, status=status.HTTP_200_OK)
+            return Response({'success': True}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -8,7 +8,9 @@ urlpatterns = [
     path('login/', views.LoginView.as_view(), name='login'),
     path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', views.ResetPasswordView.as_view(), name='reset-password'),
+    path('payment/initialize/', views.InitializePaymentView.as_view(), name='initialize-payment'),
+    path('payment/verify/', views.VerifyPaymentView.as_view(), name='verify-payment'),
     path('admin/users/', admin_views.AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<int:id>/', admin_views.AdminUserDeleteView.as_view(), name='admin-user-delete'),
-    path('test-email/', views.TestEmailView.as_view(), name='test-email'),
+    path('admin/users/<int:id>/premium/', admin_views.AdminTogglePremiumView.as_view(), name='admin-toggle-premium'),
 ]

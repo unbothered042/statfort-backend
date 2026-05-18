@@ -4,6 +4,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from datetime import timedelta
 
 
 class UserManager(BaseUserManager):
@@ -35,6 +36,7 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_active', True)
         extra_fields.setdefault('is_verified', True)
+        extra_fields.setdefault('is_premium', True)
         return self.create_user(
             first_name=extra_fields.pop('first_name'),
             last_name=extra_fields.pop('last_name'),
@@ -71,6 +73,11 @@ class User(AbstractBaseUser):
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=False)
+    is_premium = models.BooleanField(default=False)
+    premium_expires_at = models.DateTimeField(null=True, blank=True)
+    ai_insight_count = models.IntegerField(default=0)
+    elite_insight_count = models.IntegerField(default=0)
+    ai_limit_reset_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -86,6 +93,41 @@ class User(AbstractBaseUser):
 
     def has_module_perms(self, app_label):
         return self.is_superuser
+
+    def check_premium(self):
+        if self.is_superuser:
+            return True
+        if not self.is_premium:
+            return False
+        if self.premium_expires_at and timezone.now() > self.premium_expires_at:
+            self.is_premium = False
+            self.premium_expires_at = None
+            self.save()
+            return False
+        return True
+
+    def reset_daily_limits_if_needed(self):
+        now = timezone.now()
+        if self.ai_limit_reset_at is None or now > self.ai_limit_reset_at:
+            self.ai_insight_count = 0
+            self.elite_insight_count = 0
+            self.ai_limit_reset_at = now + timedelta(hours=24)
+            self.save()
+
+    def get_ai_limit(self):
+        return 20 if self.check_premium() else 5
+
+    def can_use_ai_insight(self):
+        if self.is_superuser:
+            return True
+        self.reset_daily_limits_if_needed()
+        return self.ai_insight_count < self.get_ai_limit()
+
+    def can_use_elite_insight(self):
+        if self.is_superuser:
+            return True
+        self.reset_daily_limits_if_needed()
+        return self.elite_insight_count < self.get_ai_limit()
 
 
 class OTP(models.Model):

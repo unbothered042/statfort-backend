@@ -167,6 +167,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 FORTNITE_API_KEY = os.getenv('FORTNITE_API_KEY')
 APEX_API_KEY = os.getenv('APEX_API_KEY')
 
+PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://statfort.vercel.app')
+
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
