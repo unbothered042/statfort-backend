@@ -1,1 +1,1 @@
-web: gunicorn statfort.wsgi --log-file -
+web: gunicorn statfort.wsgi:application

@@ -14,6 +14,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import timedelta
+import dj_database_url
 
 load_dotenv()
 
@@ -26,6 +27,7 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    '.onrender.com',
     '.railway.app',
 ]
 
@@ -50,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -81,8 +84,16 @@ WSGI_APPLICATION = "statfort.wsgi.application"
 import urllib.parse
 
 MYSQL_URL = os.environ.get('MYSQL_URL')
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
-if MYSQL_URL:
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600
+        )
+    }
+elif MYSQL_URL:
     parsed = urllib.parse.urlparse(MYSQL_URL)
     DATABASES = {
         'default': {
@@ -98,14 +109,11 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            'NAME': os.getenv('DB_NAME', 'statfort_db'),
+            'NAME': os.getenv('DB_NAME', 'statfort'),
             'USER': os.getenv('DB_USER', 'root'),
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
-            'HOST': os.getenv('DB_HOST', '127.0.0.1'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '3306'),
-            'OPTIONS': {
-                'autocommit': True,
-            }
         }
     }
 
@@ -121,7 +129,7 @@ TIME_ZONE = "Africa/Lagos"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+# STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -177,3 +185,7 @@ CACHES = {
         'LOCATION': 'statfort-cache',
     }
 }
+
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
