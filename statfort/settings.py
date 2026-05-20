@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "stats",
     "leaderboard",
     "insights",
+    "community",
     'django_cleanup.apps.CleanupConfig',
 ]
 
