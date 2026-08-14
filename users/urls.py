@@ -5,6 +5,7 @@ from . import admin_views
 urlpatterns = [
     path('register/', views.RegisterView.as_view(), name='register'),
     path('verify-email/', views.VerifyEmailView.as_view(), name='verify-email'),
+    path('resend-otp/', views.ResendOTPView.as_view(), name='resend-otp'),
     path('login/', views.LoginView.as_view(), name='login'),
     path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', views.ResetPasswordView.as_view(), name='reset-password'),
