@@ -32,6 +32,7 @@ class LeaderboardView(APIView):
                 'deaths': stat.deaths,
                 'assists': stat.assists,
                 'wins': stat.wins,
+                'draws': stat.draws,
                 'matches_played': stat.matches_played,
                 'kd_ratio': stat.kd_ratio,
                 'win_rate': stat.win_rate,

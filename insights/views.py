@@ -4,8 +4,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import Insight
 from .serializers import InsightSerializer
-from .ai_service import generate_insight, generate_elite_insights
-from stats.models import PlayerStats
+from .ai_service import generate_insight, generate_elite_insights, generate_efootball_elite_insights
+from stats.models import PlayerStats, EfootballSquad
 from games.models import PlayerGame
 
 
@@ -88,16 +88,40 @@ class EliteInsightView(APIView):
         except PlayerStats.DoesNotExist:
             return Response({'error': 'No approved stats found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        elite = generate_elite_insights(
-            game_name=player_game.game.name,
-            kills=stats.kills,
-            deaths=stats.deaths,
-            assists=stats.assists,
-            wins=stats.wins,
-            matches_played=stats.matches_played,
-            kd_ratio=stats.kd_ratio,
-            win_rate=stats.win_rate,
-        )
+        if player_game.game.slug == 'efootball':
+            try:
+                squad = EfootballSquad.objects.get(player_game=player_game)
+            except EfootballSquad.DoesNotExist:
+                return Response({
+                    'error': 'Configure your squad (GK, CB, CB, CDM, LW, RW, ST) in the Dashboard before generating Elite Analysis.',
+                    'requires_squad_setup': True,
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            elite = generate_efootball_elite_insights(
+                wins=stats.wins,
+                draws=stats.draws,
+                losses=stats.matches_played - stats.wins - stats.draws,
+                matches_played=stats.matches_played,
+                win_rate=stats.win_rate,
+                gk_type=squad.get_gk_type_display(),
+                cb1_type=squad.get_cb1_type_display(),
+                cb2_type=squad.get_cb2_type_display(),
+                cdm_type=squad.get_cdm_type_display(),
+                lw_type=squad.get_lw_type_display(),
+                rw_type=squad.get_rw_type_display(),
+                st_type=squad.get_st_type_display(),
+            )
+        else:
+            elite = generate_elite_insights(
+                game_name=player_game.game.name,
+                kills=stats.kills,
+                deaths=stats.deaths,
+                assists=stats.assists,
+                wins=stats.wins,
+                matches_played=stats.matches_played,
+                kd_ratio=stats.kd_ratio,
+                win_rate=stats.win_rate,
+            )
 
         user.elite_insight_count += 1
         user.save()

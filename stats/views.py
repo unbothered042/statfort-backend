@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.core.cache import cache
-from .models import PlayerStats
-from .serializers import PlayerStatsSerializer, CODStatsSubmitSerializer
+from .models import PlayerStats, EfootballSquad
+from .serializers import PlayerStatsSerializer, CODStatsSubmitSerializer, EFootballStatsSubmitSerializer, EfootballSquadSerializer
 from games.models import PlayerGame
 import os
 import base64
@@ -78,6 +78,59 @@ Check for:
 
 Respond with ONLY a JSON object in this exact format:
 {{"verified": true/false, "reason": "brief explanation", "kills": number_or_null, "deaths": number_or_null, "wins": number_or_null, "matches_played": number_or_null}}
+
+Return JSON only, no extra text."""
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500,
+        )
+
+        result = response.choices[0].message.content.strip()
+        if result.startswith("```"):
+            result = result.split("```")[1]
+            if result.startswith("json"):
+                result = result[4:]
+
+        return json.loads(result.strip())
+
+    except Exception as e:
+        return {"verified": False, "reason": str(e)}
+
+
+def verify_efootball_screenshot_with_ai(screenshot_file, gaming_id, game_name):
+    try:
+        screenshot_file.seek(0)
+        image_data = base64.b64encode(screenshot_file.read()).decode('utf-8')
+        ext = screenshot_file.name.split('.')[-1].lower()
+        media_type = 'image/png' if ext == 'png' else 'image/jpeg'
+
+        client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{media_type};base64,{image_data}"
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": f"""You are a gaming stats verification system. Analyze this screenshot and verify if it shows legitimate {game_name} Division 1 match record statistics for the player with gaming ID: {gaming_id}.
+
+Check for:
+1. Is this a real {game_name} Division 1 stats/record screen?
+2. Does it show win/draw/loss record for ranked Division 1 matches?
+3. Does the screenshot appear authentic and unedited?
+
+Respond with ONLY a JSON object in this exact format:
+{{"verified": true/false, "reason": "brief explanation", "wins": number_or_null, "draws": number_or_null, "losses": number_or_null}}
 
 Return JSON only, no extra text."""
                         }
@@ -251,6 +304,94 @@ class CODStatsSubmitView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EFootballStatsSubmitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = EFootballStatsSubmitSerializer(data=request.data)
+        if serializer.is_valid():
+            player_game_id = serializer.validated_data['player_game_id']
+
+            try:
+                player_game = PlayerGame.objects.get(id=player_game_id, user=request.user, game__slug='efootball')
+            except PlayerGame.DoesNotExist:
+                return Response({'error': 'eFootball player game not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            screenshot = serializer.validated_data['screenshot']
+            ai_result = verify_efootball_screenshot_with_ai(screenshot, player_game.gaming_id, 'eFootball')
+
+            if not ai_result.get('verified', False):
+                return Response({
+                    'error': f'Screenshot verification failed. {ai_result.get("reason", "Please submit a clear screenshot of your eFootball Division 1 record.")}',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            ai_wins = ai_result.get('wins') if ai_result.get('wins') is not None else serializer.validated_data['wins']
+            ai_draws = ai_result.get('draws') if ai_result.get('draws') is not None else serializer.validated_data['draws']
+            ai_losses = ai_result.get('losses') if ai_result.get('losses') is not None else serializer.validated_data['losses']
+            matches_played = ai_wins + ai_draws + ai_losses
+
+            screenshot.seek(0)
+            stats, created = PlayerStats.objects.update_or_create(
+                player_game=player_game,
+                defaults={
+                    'wins': ai_wins,
+                    'draws': ai_draws,
+                    'matches_played': matches_played,
+                    'score': (ai_wins * 3) + ai_draws,
+                    'screenshot': screenshot,
+                    'status': 'approved',
+                }
+            )
+
+            cache.delete(f'leaderboard_{player_game.game.slug}')
+            cache.delete(f'player_stats_{request.user.id}')
+
+            stat_serializer = PlayerStatsSerializer(stats)
+            return Response({
+                'message': 'Stats verified and approved by AI.',
+                'data': stat_serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EfootballSquadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        player_game_id = request.query_params.get('player_game_id')
+        try:
+            player_game = PlayerGame.objects.get(id=player_game_id, user=request.user)
+            squad = EfootballSquad.objects.get(player_game=player_game)
+            return Response(EfootballSquadSerializer(squad).data, status=status.HTTP_200_OK)
+        except (PlayerGame.DoesNotExist, EfootballSquad.DoesNotExist):
+            return Response({'error': 'No squad configured yet.'}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        player_game_id = request.data.get('player_game_id')
+        try:
+            player_game = PlayerGame.objects.get(id=player_game_id, user=request.user)
+        except PlayerGame.DoesNotExist:
+            return Response({'error': 'Player game not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if player_game.game.slug != 'efootball':
+            return Response({'error': 'Squad setup is only available for eFootball.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        squad, created = EfootballSquad.objects.update_or_create(
+            player_game=player_game,
+            defaults={
+                'gk_type': request.data.get('gk_type'),
+                'cb1_type': request.data.get('cb1_type'),
+                'cb2_type': request.data.get('cb2_type'),
+                'cdm_type': request.data.get('cdm_type'),
+                'lw_type': request.data.get('lw_type'),
+                'rw_type': request.data.get('rw_type'),
+                'st_type': request.data.get('st_type'),
+            }
+        )
+        return Response(EfootballSquadSerializer(squad).data, status=status.HTTP_200_OK)
 
 
 class PlayerStatsView(APIView):

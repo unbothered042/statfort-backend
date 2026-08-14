@@ -15,6 +15,7 @@ class PlayerStats(models.Model):
     deaths = models.IntegerField(default=0)
     assists = models.IntegerField(default=0)
     wins = models.IntegerField(default=0)
+    draws = models.IntegerField(default=0)
     matches_played = models.IntegerField(default=0)
     kd_ratio = models.FloatField(default=0.0)
     win_rate = models.FloatField(default=0.0)
@@ -44,3 +45,44 @@ class PlayerStats(models.Model):
         self.kd_ratio = self.calculate_kd()
         self.win_rate = self.calculate_win_rate()
         super().save(*args, **kwargs)
+
+
+# --- eFootball Elite: Squad Composition (for pairing analysis) ---
+
+PLAYER_TYPE_CHOICES = [
+    ('destroyer', 'Destroyer'),
+    ('anchor_man', 'Anchor Man'),
+    ('extra_frame', 'Extra Frame'),
+    ('catalyst', 'Catalyst'),
+    ('long_ball_expert', 'Long Ball Expert'),
+    ('aerial_threat', 'Aerial Threat'),
+    ('box_to_box', 'Box-to-Box'),
+    ('deep_lying_playmaker', 'Deep-Lying Playmaker'),
+    ('the_incisive_run', 'The Incisive Run'),
+    ('prolific_winger', 'Prolific Winger'),
+    ('cross_specialist', 'Cross Specialist'),
+    ('speedster', 'Speedster'),
+    ('goal_poacher', 'Goal Poacher'),
+    ('target_man', 'Target Man'),
+    ('dummy_runner', 'Dummy Runner'),
+]
+
+
+class EfootballSquad(models.Model):
+    """Stores a user's key pack player types for the 7 synergy-critical
+    positions used in Elite Tier squad pairing analysis."""
+
+    player_game = models.OneToOneField(PlayerGame, on_delete=models.CASCADE, related_name='efootball_squad')
+
+    gk_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+    cb1_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+    cb2_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+    cdm_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+    lw_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+    rw_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+    st_type = models.CharField(max_length=30, choices=PLAYER_TYPE_CHOICES)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.player_game.user.email} - Squad Setup"

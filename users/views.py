@@ -14,6 +14,7 @@ import random
 import os
 import resend
 import requests
+import threading
 from datetime import timedelta
 
 
@@ -172,7 +173,7 @@ class InitializePaymentView(APIView):
         }
         data = {
             'email': user.email,
-            'amount': 150000,
+            'amount': 100000,  # changed from 150000 (₦1,500) to ₦1,000
             'currency': 'NGN',
             'callback_url': f'{os.getenv("FRONTEND_URL", "https://statfort.vercel.app")}/elite?payment=success',
             'metadata': {'user_id': user.id, 'plan': 'premium_monthly'},
@@ -187,7 +188,6 @@ class InitializePaymentView(APIView):
             }, status=status.HTTP_200_OK)
 
         return Response({'error': 'Payment initialization failed.'}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class VerifyPaymentView(APIView):
     permission_classes = [IsAuthenticated]
@@ -229,3 +229,59 @@ class TestEmailView(APIView):
             return Response({'success': True}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'success': False, 'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ContactView(APIView):
+    def post(self, request):
+        name = request.data.get('name', '').strip()
+        email = request.data.get('email', '').strip()
+        subject = request.data.get('subject', '').strip()
+        message = request.data.get('message', '').strip()
+
+        if not name or not email or not subject or not message:
+            return Response({'error': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(message) < 10:
+            return Response({'error': 'Message is too short.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        def send_email():
+            try:
+                resend.api_key = os.getenv('RESEND_API_KEY')
+                resend.Emails.send({
+                    "from": "StatFort Support <onboarding@resend.dev>",
+                    "to": ["statfort9@gmail.com"],
+                    "subject": f"[StatFort Support] {subject}",
+                    "html": f"""
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #111111; color: #ffffff; padding: 32px; border-radius: 8px;">
+                            <div style="border-bottom: 3px solid #FFD700; padding-bottom: 16px; margin-bottom: 24px;">
+                                <h2 style="color: #FFD700; margin: 0; font-size: 24px;">StatFort Support Request</h2>
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 8px 0; color: #AAAAAA; width: 100px;"><strong>From:</strong></td>
+                                    <td style="padding: 8px 0; color: #ffffff;">{name}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; color: #AAAAAA;"><strong>Email:</strong></td>
+                                    <td style="padding: 8px 0; color: #FFD700;">{email}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; color: #AAAAAA;"><strong>Subject:</strong></td>
+                                    <td style="padding: 8px 0; color: #ffffff;">{subject}</td>
+                                </tr>
+                            </table>
+                            <div style="margin-top: 24px; padding: 20px; background: #1A1A1A; border-left: 3px solid #FFD700; border-radius: 4px;">
+                                <p style="color: #AAAAAA; margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Message</p>
+                                <p style="color: #ffffff; margin: 0; line-height: 1.7; white-space: pre-wrap;">{message}</p>
+                            </div>
+                            <p style="color: #555555; font-size: 12px; margin-top: 24px; text-align: center;">Sent from StatFort Support System — statfort.vercel.app</p>
+                        </div>
+                    """,
+                    "reply_to": email,
+                })
+            except Exception as e:
+                print(f"Support email error: {str(e)}")
+
+        thread = threading.Thread(target=send_email)
+        thread.start()
+
+        return Response({'message': 'Your message has been sent. We will get back to you shortly.'}, status=status.HTTP_200_OK)

@@ -10,6 +10,7 @@ urlpatterns = [
     path('reset-password/', views.ResetPasswordView.as_view(), name='reset-password'),
     path('payment/initialize/', views.InitializePaymentView.as_view(), name='initialize-payment'),
     path('payment/verify/', views.VerifyPaymentView.as_view(), name='verify-payment'),
+    path('contact/', views.ContactView.as_view(), name='contact'),
     path('admin/users/', admin_views.AdminUserListView.as_view(), name='admin-users'),
     path('admin/users/<int:id>/', admin_views.AdminUserDeleteView.as_view(), name='admin-user-delete'),
     path('admin/users/<int:id>/premium/', admin_views.AdminTogglePremiumView.as_view(), name='admin-toggle-premium'),
