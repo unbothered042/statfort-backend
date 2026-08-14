@@ -49,17 +49,9 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
             user.is_active = True
-            user.is_verified = False
+            user.is_verified = True
             user.save()
-
-            code = generate_otp()
-            OTP.objects.create(
-                user=user, code=code, purpose='verify_email',
-                expires_at=timezone.now() + timedelta(minutes=10)
-            )
-            send_otp_email(user.email, code, 'verify_email')
-
-            return Response({'message': 'Registration successful. Check your email for a verification code.'}, status=status.HTTP_201_CREATED)
+            return Response({'message': 'Registration successful. You can now log in.'}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -143,14 +135,8 @@ class ForgotPasswordView(APIView):
         if serializer.is_valid():
             email = serializer.validated_data['email']
             try:
-                user = User.objects.get(email=email)
-                code = generate_otp()
-                OTP.objects.create(
-                    user=user, code=code, purpose='reset_password',
-                    expires_at=timezone.now() + timedelta(minutes=10)
-                )
-                send_otp_email(user.email, code, 'reset_password')
-                return Response({'message': 'A reset code has been sent to your email.'}, status=status.HTTP_200_OK)
+                User.objects.get(email=email)
+                return Response({'message': 'Email found. You can now reset your password.'}, status=status.HTTP_200_OK)
             except User.DoesNotExist:
                 return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -159,51 +145,20 @@ class ForgotPasswordView(APIView):
 class ResetPasswordView(APIView):
     def post(self, request):
         email = request.data.get('email')
-        code = request.data.get('code')
         new_password = request.data.get('new_password')
 
-        if not email or not code or not new_password:
-            return Response({'error': 'Email, code, and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not email or not new_password:
+            return Response({'error': 'Email and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(new_password) < 6:
             return Response({'error': 'Password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user = User.objects.get(email=email)
-            otp = OTP.objects.filter(user=user, code=code, purpose='reset_password', is_used=False).latest('created_at')
-            if otp.is_expired():
-                return Response({'error': 'Code has expired.'}, status=status.HTTP_400_BAD_REQUEST)
-            otp.is_used = True
-            otp.save()
             user.set_password(new_password)
             user.save()
             return Response({'message': 'Password reset successful.'}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-        except OTP.DoesNotExist:
-            return Response({'error': 'Invalid code.'}, status=status.HTTP_400_BAD_REQUEST)
-
-class ResendOTPView(APIView):
-    def post(self, request):
-        email = request.data.get('email')
-        if not email:
-            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        if user.is_verified:
-            return Response({'error': 'Email is already verified.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        code = generate_otp()
-        OTP.objects.create(
-            user=user, code=code, purpose='verify_email',
-            expires_at=timezone.now() + timedelta(minutes=10)
-        )
-        send_otp_email(user.email, code, 'verify_email')
-
-        return Response({'message': 'A new verification code has been sent to your email.'}, status=status.HTTP_200_OK)
 
 
 class InitializePaymentView(APIView):
