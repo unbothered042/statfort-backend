@@ -22,7 +22,7 @@ def generate_insight(game_name, kills, deaths, assists, wins, matches_played, kd
     """
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.5,
     )
@@ -76,7 +76,7 @@ def generate_elite_insights(game_name, kills, deaths, assists, wins, matches_pla
     """
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
     )
@@ -161,7 +161,7 @@ def generate_efootball_elite_insights(wins, draws, losses, matches_played, win_r
     """
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4,
     )

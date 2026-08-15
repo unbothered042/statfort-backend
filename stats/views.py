@@ -55,7 +55,7 @@ def verify_screenshot_with_ai(screenshot_file, gaming_id, game_name):
         client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
         response = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model="meta-llama/llama-4-maverick-17b-128e-instruct",
             messages=[
                 {
                     "role": "user",
@@ -109,7 +109,7 @@ def verify_efootball_screenshot_with_ai(screenshot_file, gaming_id, game_name):
         client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
         response = client.chat.completions.create(
-            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            model="meta-llama/llama-4-maverick-17b-128e-instruct",
             messages=[
                 {
                     "role": "user",
