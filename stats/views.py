@@ -77,6 +77,8 @@ Check for:
 3. Does the username/gaming ID match or is it visible?
 4. Does the screenshot appear authentic and unedited?
 
+Do NOT reject a screenshot based on any dates, season numbers, or time periods shown in the image. You do not have reliable knowledge of today's actual date, so treat dates as irrelevant to verification.
+
 Respond with ONLY a JSON object in this exact format:
 {{"verified": true/false, "reason": "brief explanation", "kills": number_or_null, "deaths": number_or_null, "wins": number_or_null, "matches_played": number_or_null}}
 
@@ -127,9 +129,11 @@ def verify_efootball_screenshot_with_ai(screenshot_file, gaming_id, game_name):
                             "text": f"""You are a gaming stats verification system. Analyze this screenshot and verify if it shows legitimate {game_name} Division 1 match record statistics for the player with gaming ID: {gaming_id}.
 
 Check for:
-1. Is this a real {game_name} Division 1 stats/record screen?
+1. Is this a real {game_name} Division 1 stats/record screen (matches the game's actual UI, icons, and layout)?
 2. Does it show win/draw/loss record for ranked Division 1 matches?
-3. Does the screenshot appear authentic and unedited?
+3. Does the screenshot appear authentic and unedited (no signs of image manipulation, mismatched fonts, or altered numbers)?
+
+Do NOT reject a screenshot based on any dates, phase numbers, or time periods shown in the image. You do not have reliable knowledge of today's actual date, so any date shown in the screenshot could be genuinely current, past, or a season period entirely valid within the game — treat dates as irrelevant to verification.
 
 Respond with ONLY a JSON object in this exact format:
 {{"verified": true/false, "reason": "brief explanation", "wins": number_or_null, "draws": number_or_null, "losses": number_or_null}}
