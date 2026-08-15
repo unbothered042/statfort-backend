@@ -86,3 +86,16 @@ class EfootballSquad(models.Model):
 
     def __str__(self):
         return f"{self.player_game.user.email} - Squad Setup"
+
+
+# --- eFootball Screenshot Verification Rate Limiting (3/day, since each check calls the AI) ---
+
+class EfootballScreenshotUpload(models.Model):
+    """One row per eFootball screenshot verification attempt. Used to cap
+    verification calls to 3 per user per calendar day."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='efootball_screenshot_uploads')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.email} - {self.uploaded_at.date()}"

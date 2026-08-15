@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from django.core.cache import cache
-from .models import PlayerStats, EfootballSquad
+from django.utils import timezone
+from .models import PlayerStats, EfootballSquad, EfootballScreenshotUpload
 from .serializers import PlayerStatsSerializer, CODStatsSubmitSerializer, EFootballStatsSubmitSerializer, EfootballSquadSerializer
 from games.models import PlayerGame
 import os
@@ -11,6 +12,8 @@ import base64
 import json
 import requests
 from groq import Groq
+
+EFOOTBALL_DAILY_SCREENSHOT_LIMIT = 3
 
 
 class IsSuperUser(BasePermission):
@@ -325,12 +328,28 @@ class EFootballStatsSubmitView(APIView):
             except PlayerGame.DoesNotExist:
                 return Response({'error': 'eFootball player game not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+            today = timezone.now().date()
+            uploads_today = EfootballScreenshotUpload.objects.filter(user=request.user, uploaded_at__date=today).count()
+
+            if uploads_today >= EFOOTBALL_DAILY_SCREENSHOT_LIMIT:
+                return Response({
+                    'error': f'Daily screenshot verification limit reached ({EFOOTBALL_DAILY_SCREENSHOT_LIMIT}/{EFOOTBALL_DAILY_SCREENSHOT_LIMIT} used today). Try again tomorrow.',
+                    'limit_exhausted': True,
+                    'uploads_remaining': 0,
+                }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
             screenshot = serializer.validated_data['screenshot']
             ai_result = verify_efootball_screenshot_with_ai(screenshot, player_game.gaming_id, 'eFootball')
+
+            # Count this attempt against the daily limit regardless of outcome —
+            # the AI call itself is what costs money, not just successful verifications.
+            EfootballScreenshotUpload.objects.create(user=request.user)
+            uploads_remaining = max(0, EFOOTBALL_DAILY_SCREENSHOT_LIMIT - (uploads_today + 1))
 
             if not ai_result.get('verified', False):
                 return Response({
                     'error': f'Screenshot verification failed. {ai_result.get("reason", "Please submit a clear screenshot of your eFootball Division 1 record.")}',
+                    'uploads_remaining': uploads_remaining,
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             ai_wins = ai_result.get('wins') if ai_result.get('wins') is not None else serializer.validated_data['wins']
@@ -357,10 +376,24 @@ class EFootballStatsSubmitView(APIView):
             stat_serializer = PlayerStatsSerializer(stats)
             return Response({
                 'message': 'Stats verified and approved by AI.',
-                'data': stat_serializer.data
+                'data': stat_serializer.data,
+                'uploads_remaining': uploads_remaining,
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EfootballUploadStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.now().date()
+        uploads_today = EfootballScreenshotUpload.objects.filter(user=request.user, uploaded_at__date=today).count()
+        return Response({
+            'uploads_used': uploads_today,
+            'uploads_remaining': max(0, EFOOTBALL_DAILY_SCREENSHOT_LIMIT - uploads_today),
+            'daily_limit': EFOOTBALL_DAILY_SCREENSHOT_LIMIT,
+        }, status=status.HTTP_200_OK)
 
 
 class EfootballSquadView(APIView):
