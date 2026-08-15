@@ -120,6 +120,8 @@ def generate_efootball_elite_insights(wins, draws, losses, matches_played, win_r
     Squad Pack Player Types (by position):
     {squad_list}
 
+    Important eFootball context: Division 1 is the highest and top-most division in eFootball's ranked ladder — there is no "Division 2" or higher division to progress into. Progression within Division 1 is measured by win rate, global/regional ranking percentile, or leaderboard position (e.g. "Top 150 players", "Top 5% of Division 1"), never by moving to a different division number.
+
     Key tactical knowledge to apply:
     - Two "Destroyer" type players in the defensive line (CB/CB/CDM) both aggressively step out of position to tackle, leaving gaps behind the defense at the same time. This is a common and costly pairing mistake.
     - "Anchor Man" and "Extra Frame" types hold position and are strong pairing partners with a Destroyer, since one covers depth while the other presses.
@@ -152,8 +154,8 @@ def generate_efootball_elite_insights(wins, draws, losses, matches_played, win_r
         }},
         "growth_projection": {{
             "title": "AI Growth Projection",
-            "projected_rank": "estimated division/rank tier in 30 days if squad synergy issues are fixed",
-            "analysis": "2-3 sentences on projected improvement trajectory and what to focus on first"
+            "projected_rank": "estimated Division 1 ranking in 30 days if squad synergy issues are fixed, e.g. 'Top 150 in Division 1' or 'Top 5% of Division 1' — never a different division number",
+            "analysis": "2-3 sentences on projected improvement trajectory within Division 1 and what to focus on first"
         }}
     }}
 
