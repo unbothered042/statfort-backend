@@ -56,6 +56,7 @@ def verify_screenshot_with_ai(screenshot_file, gaming_id, game_name):
 
         response = client.chat.completions.create(
             model="qwen/qwen3.6-27b",
+            reasoning_effort="none",
             messages=[
                 {
                     "role": "user",
@@ -84,7 +85,7 @@ Return JSON only, no extra text."""
                     ]
                 }
             ],
-            max_tokens=500,
+            max_tokens=800,
         )
 
         result = response.choices[0].message.content.strip()
@@ -110,6 +111,7 @@ def verify_efootball_screenshot_with_ai(screenshot_file, gaming_id, game_name):
 
         response = client.chat.completions.create(
             model="qwen/qwen3.6-27b",
+            reasoning_effort="none",
             messages=[
                 {
                     "role": "user",
@@ -137,7 +139,7 @@ Return JSON only, no extra text."""
                     ]
                 }
             ],
-            max_tokens=500,
+            max_tokens=800,
         )
 
         result = response.choices[0].message.content.strip()
